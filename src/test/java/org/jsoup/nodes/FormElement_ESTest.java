@@ -17,7 +17,7 @@ import org.jsoup.parser.Tag;
 import org.jsoup.select.Elements;
 import org.junit.runner.RunWith;
 
-@RunWith(EvoRunner.class) @EvoRunnerParameters(mockJVMNonDeterminism = true, useVFS = true, useVNET = true, resetStaticState = true, separateClassLoader = false, useJEE = true) 
+@RunWith(EvoRunner.class) @EvoRunnerParameters(mockJVMNonDeterminism = true, useVFS = true, useVNET = true, resetStaticState = true, separateClassLoader = true, useJEE = true) 
 public class FormElement_ESTest extends FormElement_ESTest_scaffolding {
 
   @Test(timeout = 4000)

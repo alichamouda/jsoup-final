@@ -14,7 +14,7 @@ import org.evosuite.runtime.mock.java.io.MockIOException;
 import org.jsoup.UncheckedIOException;
 import org.junit.runner.RunWith;
 
-@RunWith(EvoRunner.class) @EvoRunnerParameters(mockJVMNonDeterminism = true, useVFS = true, useVNET = true, resetStaticState = true, separateClassLoader = false, useJEE = true) 
+@RunWith(EvoRunner.class) @EvoRunnerParameters(mockJVMNonDeterminism = true, useVFS = true, useVNET = true, resetStaticState = true, separateClassLoader = true, useJEE = true) 
 public class UncheckedIOException_ESTest extends UncheckedIOException_ESTest_scaffolding {
 
   @Test(timeout = 4000)
