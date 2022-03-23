@@ -1,6 +1,6 @@
 package org.jsoup.nodes;
 
-import org.jsoup.internal.StringUtil;
+import org.jsoup.helper.StringUtil;
 import org.jsoup.helper.Validate;
 
 import java.io.IOException;
@@ -10,6 +10,7 @@ import java.io.IOException;
 
  @author Jonathan Hedley, jonathan@hedley.net */
 public class TextNode extends LeafNode {
+
     /**
      Create a new TextNode representing the supplied (unencoded) text).
 
@@ -18,6 +19,18 @@ public class TextNode extends LeafNode {
      */
     public TextNode(String text) {
         value = text;
+    }
+
+    /**
+     Create a new TextNode representing the supplied (unencoded) text).
+
+     @param text raw text
+     @param baseUri base uri - ignored for this node type
+     @see #createFromEncoded(String, String)
+     @deprecated use {@link TextNode#TextNode(String)}
+     */
+    public TextNode(String text, String baseUri) {
+        this(text);
     }
 
 	public String nodeName() {
@@ -74,27 +87,19 @@ public class TextNode extends LeafNode {
         String tail = text.substring(offset);
         text(head);
         TextNode tailNode = new TextNode(tail);
-        if (parentNode != null)
-            parentNode.addChildren(siblingIndex()+1, tailNode);
+        if (parent() != null)
+            parent().addChildren(siblingIndex()+1, tailNode);
 
         return tailNode;
     }
 
 	void outerHtmlHead(Appendable accum, int depth, Document.OutputSettings out) throws IOException {
-        final boolean prettyPrint = out.prettyPrint();
-        final Element parent = parentNode instanceof Element ? ((Element) parentNode) : null;
-        final boolean parentIndent = parent != null && parent.shouldIndent(out);
-        final boolean blank = isBlank();
-
-        if (parentIndent && StringUtil.startsWithNewline(coreValue()) && blank) // we are skippable whitespace
-            return;
-
-        if (prettyPrint && ((siblingIndex == 0 && parent != null && parent.tag().formatAsBlock() && !blank) || (out.outline() && siblingNodes().size()>0 && !blank) ))
+        if (out.prettyPrint() && ((siblingIndex() == 0 && parentNode instanceof Element && ((Element) parentNode).tag().formatAsBlock() && !isBlank()) || (out.outline() && siblingNodes().size()>0 && !isBlank()) ))
             indent(accum, depth, out);
 
-        final boolean normaliseWhite = prettyPrint && !Element.preserveWhitespace(parentNode);
-        final boolean stripWhite = prettyPrint && parentNode instanceof Document;
-        Entities.escape(accum, coreValue(), out, false, normaliseWhite, stripWhite);
+        boolean normaliseWhite = out.prettyPrint() && parent() instanceof Element
+                && !Element.preserveWhitespace(parent());
+        Entities.escape(accum, coreValue(), out, false, normaliseWhite, false);
     }
 
 	void outerHtmlTail(Appendable accum, int depth, Document.OutputSettings out) {}
@@ -104,9 +109,16 @@ public class TextNode extends LeafNode {
         return outerHtml();
     }
 
-    @Override
-    public TextNode clone() {
-        return (TextNode) super.clone();
+    /**
+     * Create a new TextNode from HTML encoded (aka escaped) data.
+     * @param encodedText Text containing encoded HTML (e.g. &amp;lt;)
+     * @param baseUri Base uri
+     * @return TextNode containing unencoded data (e.g. &lt;)
+     * @deprecated use {@link TextNode#createFromEncoded(String)} instead, as LeafNodes don't carry base URIs.
+     */
+    public static TextNode createFromEncoded(String encodedText, String baseUri) {
+        String text = Entities.unescape(encodedText);
+        return new TextNode(text);
     }
 
     /**

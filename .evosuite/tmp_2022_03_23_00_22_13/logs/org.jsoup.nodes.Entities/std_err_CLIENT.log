@@ -1,0 +1,23 @@
+[MASTER] 00:28:02.227 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.concurrent.ForkJoinTask<V> : Type points to itself
+[MASTER] 00:28:19.492 [Thread-4] ERROR ClientNodeImpl - Cannot inform master of change of state
+java.rmi.UnmarshalException: Error unmarshaling return header; nested exception is: 
+	java.net.SocketException: Broken pipe (Write failed)
+	at sun.rmi.transport.StreamRemoteCall.executeCall(StreamRemoteCall.java:254) ~[na:1.8.0_312]
+	at sun.rmi.server.UnicastRef.invoke(UnicastRef.java:164) ~[na:1.8.0_312]
+	at java.rmi.server.RemoteObjectInvocationHandler.invokeRemoteMethod(RemoteObjectInvocationHandler.java:235) ~[na:1.8.0_312]
+	at java.rmi.server.RemoteObjectInvocationHandler.invoke(RemoteObjectInvocationHandler.java:180) ~[na:1.8.0_312]
+	at com.sun.proxy.$Proxy7.evosuite_collectStatistics(Unknown Source) ~[na:na]
+	at org.evosuite.rmi.service.ClientNodeImpl.updateStatistics(ClientNodeImpl.java:237) ~[evosuite-master-1.0.6.jar:1.0.6]
+	at org.evosuite.statistics.StatisticsSender.sendIndividualToMaster(StatisticsSender.java:68) [evosuite-master-1.0.6.jar:1.0.6]
+	at org.evosuite.statistics.StatisticsListener$1.run(StatisticsListener.java:71) [evosuite-master-1.0.6.jar:1.0.6]
+Caused by: java.net.SocketException: Broken pipe (Write failed)
+	at java.net.SocketOutputStream.socketWrite0(Native Method) ~[na:1.8.0_312]
+	at java.net.SocketOutputStream.socketWrite(SocketOutputStream.java:111) ~[na:1.8.0_312]
+	at java.net.SocketOutputStream.write(SocketOutputStream.java:155) ~[na:1.8.0_312]
+	at java.io.BufferedOutputStream.flushBuffer(BufferedOutputStream.java:82) ~[na:1.8.0_312]
+	at java.io.BufferedOutputStream.flush(BufferedOutputStream.java:140) ~[na:1.8.0_312]
+	at java.io.ObjectOutputStream$BlockDataOutputStream.flush(ObjectOutputStream.java:1823) ~[na:1.8.0_312]
+	at java.io.ObjectOutputStream.flush(ObjectOutputStream.java:719) ~[na:1.8.0_312]
+	at sun.rmi.transport.StreamRemoteCall.releaseOutputStream(StreamRemoteCall.java:120) ~[na:1.8.0_312]
+	at sun.rmi.transport.StreamRemoteCall.executeCall(StreamRemoteCall.java:238) ~[na:1.8.0_312]
+	... 7 common frames omitted

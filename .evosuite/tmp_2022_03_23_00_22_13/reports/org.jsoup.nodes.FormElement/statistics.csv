@@ -1,0 +1,2 @@
+TARGET_CLASS,configuration_id,criterion,ctg_min_time_per_job,ctg_schedule,search_budget,p_object_pool,ctg_time_per_class,Size,Length,Total_Time,Random_Seed,BranchCoverage,BranchCoverageBitString
+org.jsoup.nodes.FormElement,default,BRANCH,1,BUDGET,55,0.3,2,5,20,73016,1647991866156,0.3125,11111110110100000000000000000000

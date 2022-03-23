@@ -1,0 +1,4 @@
+[MASTER] 00:26:55.167 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.concurrent.ForkJoinTask<V> : Type points to itself
+[MASTER] 00:26:55.472 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.EnumSet<E> : Type points to itself
+[MASTER] 00:27:11.545 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.function.Function<T, R> : Type points to itself
+[MASTER] 00:27:28.581 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.Iterator<E> : Type points to itself

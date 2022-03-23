@@ -3,12 +3,9 @@ package org.jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.parser.Parser;
 
-import javax.annotation.Nullable;
-import javax.net.ssl.SSLSocketFactory;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.CookieStore;
 import java.net.Proxy;
 import java.net.URL;
 import java.util.Collection;
@@ -16,27 +13,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- The Connection interface is a convenient HTTP client and session object to fetch content from the web, and parse them
- into Documents.
- <p>To start a new session, use either {@link org.jsoup.Jsoup#newSession()} or {@link org.jsoup.Jsoup#connect(String)}.
- Connections contain {@link Connection.Request} and {@link Connection.Response} objects (once executed). Configuration
- settings (URL, timeout, useragent, etc) set on a session will be applied by default to each subsequent request.</p>
- <p>To start a new request from the session, use {@link #newRequest()}.</p>
- <p>Cookies are stored in memory for the duration of the session. For that reason, do not use one single session for all
- requests in a long-lived application, or you are likely to run out of memory, unless care is taken to clean up the
- cookie store. The cookie store for the session is available via {@link #cookieStore()}. You may provide your own
- implementation via {@link #cookieStore(java.net.CookieStore)} before making requests.</p>
- <p>Request configuration can be made using either the shortcut methods in Connection (e.g. {@link #userAgent(String)}),
- or by methods in the Connection.Request object directly. All request configuration must be made before the request is
- executed. When used as an ongoing session, initialize all defaults prior to making multi-threaded {@link
-#newRequest()}s.</p>
- <p>Note that the term "Connection" used here does not mean that a long-lived connection is held against a server for
- the lifetime of the Connection object. A socket connection is only made at the point of request execution ({@link
-#execute()}, {@link #get()}, or {@link #post()}), and the server's response consumed.</p>
- <p>For multi-threaded implementations, it is important to use a {@link #newRequest()} for each request. The session may
- be shared across threads but a given request, not.</p>
+ * A Connection provides a convenient interface to fetch content from the web, and parse them into Documents.
+ * <p>
+ * To get a new Connection, use {@link org.jsoup.Jsoup#connect(String)}. Connections contain {@link Connection.Request}
+ * and {@link Connection.Response} objects. The request objects are reusable as prototype requests.
+ * </p>
+ * <p>
+ * Request configuration can be made using either the shortcut methods in Connection (e.g. {@link #userAgent(String)}),
+ * or by methods in the Connection.Request object directly. All request configuration must be made before the request is
+ * executed.
+ * </p>
  */
-@SuppressWarnings("unused")
 public interface Connection {
 
     /**
@@ -61,13 +48,6 @@ public interface Connection {
     }
 
     /**
-     Creates a new request, using this Connection as the session-state and to initialize the connection settings (which may then be independently on the returned Connection.Request object).
-     @return a new Connection object, with a shared Cookie Store and initialized settings from this Connection and Request
-     @since 1.14.1
-     */
-    Connection newRequest();
-
-    /**
      * Set the request URL to fetch. The protocol must be HTTP or HTTPS.
      * @param url URL to connect to
      * @return this Connection, for chaining
@@ -82,11 +62,11 @@ public interface Connection {
     Connection url(String url);
 
     /**
-     * Set the proxy to use for this request. Set to <code>null</code> to disable a previously set proxy.
+     * Set the proxy to use for this request. Set to <code>null</code> to disable.
      * @param proxy proxy to use
      * @return this Connection, for chaining
      */
-    Connection proxy(@Nullable Proxy proxy);
+    Connection proxy(Proxy proxy);
 
     /**
      * Set the HTTP proxy to use for this request.
@@ -117,10 +97,8 @@ public interface Connection {
 
     /**
      * Set the maximum bytes to read from the (uncompressed) connection into the body, before the connection is closed,
-     * and the input truncated (i.e. the body content will be trimmed). <b>The default maximum is 2MB</b>. A max size of
-     * <code>0</code> is treated as an infinite amount (bounded only by your patience and the memory available on your
-     * machine).
-     *
+     * and the input truncated. The default maximum is 1MB. A max size of zero is treated as an infinite amount (bounded
+     * only by your patience and the memory available on your machine).
      * @param bytes number of bytes to read from the input before truncating
      * @return this Connection, for chaining
      */
@@ -167,11 +145,25 @@ public interface Connection {
     Connection ignoreContentType(boolean ignoreContentType);
 
     /**
-     * Set custom SSL socket factory
-     * @param sslSocketFactory custom SSL socket factory
+     * Disable/enable TLS certificates validation for HTTPS requests.
+     * <p>
+     * By default this is <b>true</b>; all
+     * connections over HTTPS perform normal validation of certificates, and will abort requests if the provided
+     * certificate does not validate.
+     * </p>
+     * <p>
+     * Some servers use expired, self-generated certificates; or your JDK may not
+     * support SNI hosts. In which case, you may want to enable this setting.
+     * </p>
+     * <p>
+     * <b>Be careful</b> and understand why you need to disable these validations.
+     * </p>
+     * @param value if should validate TLS (SSL) certificates. <b>true</b> by default.
      * @return this Connection, for chaining
+     * @deprecated as distributions (specifically Google Play) are starting to show warnings if these checks are
+     * disabled.
      */
-    Connection sslSocketFactory(SSLSocketFactory sslSocketFactory);
+    Connection validateTLSCertificates(boolean value);
 
     /**
      * Add a request data parameter. Request parameters are sent in the request query string for GETs, and in the
@@ -223,15 +215,11 @@ public interface Connection {
     Connection data(Map<String, String> data);
 
     /**
-     Add one or more request {@code key, val} data parameter pairs.<p>Multiple parameters may be set at once, e.g.:
-     <code>.data("name", "jsoup", "language", "Java", "language", "English");</code> creates a query string like:
-     <code>{@literal ?name=jsoup&language=Java&language=English}</code></p>
-     <p>For GET requests, data parameters will be sent on the request query string. For POST (and other methods that
-     contain a body), they will be sent as body form parameters, unless the body is explicitly set by {@link
-    #requestBody(String)}, in which case they will be query string parameters.</p>
-
-     @param keyvals a set of key value pairs.
-     @return this Connection, for chaining
+     * Add a number of request data parameters. Multiple parameters may be set at once, e.g.: <code>.data("name",
+     * "jsoup", "language", "Java", "language", "English");</code> creates a query string like:
+     * <code>{@literal ?name=jsoup&language=Java&language=English}</code>
+     * @param keyvals a set of key value pairs.
+     * @return this Connection, for chaining
      */
     Connection data(String... keyvals);
 
@@ -240,7 +228,7 @@ public interface Connection {
      * @param key the data key
      * @return null if not set
      */
-    @Nullable KeyVal data(String key);
+    KeyVal data(String key);
 
     /**
      * Set a POST (or PUT) request body. Useful when a server expects a plain request body, not a set for URL
@@ -285,21 +273,6 @@ public interface Connection {
      * @return this Connection, for chaining
      */
     Connection cookies(Map<String, String> cookies);
-
-    /**
-     Provide a custom or pre-filled CookieStore to be used on requests made by this Connection.
-     @param cookieStore a cookie store to use for subsequent requests
-     @return this Connection, for chaining
-     @since 1.14.1
-     */
-    Connection cookieStore(CookieStore cookieStore);
-
-    /**
-     Get the cookie store used by this Connection.
-     @return the cookie store
-     @since 1.14.1
-     */
-    CookieStore cookieStore();
 
     /**
      * Provide an alternate parser to use when parsing the response to a Document. If not set, defaults to the HTML
@@ -363,9 +336,8 @@ public interface Connection {
     Connection request(Request request);
 
     /**
-     * Get the response, once the request has been executed.
+     * Get the response, once the request has been executed
      * @return response
-     * @throws IllegalArgumentException if called before the response has been executed.
      */
     Response response();
 
@@ -380,12 +352,11 @@ public interface Connection {
      * Common methods for Requests and Responses
      * @param <T> Type of Base, either Request or Response
      */
-    @SuppressWarnings("UnusedReturnValue")
-    interface Base<T extends Base<T>> {
+    interface Base<T extends Base> {
+
         /**
-         * Get the URL of this Request or Response. For redirected responses, this will be the final destination URL.
+         * Get the URL
          * @return URL
-         * @throws IllegalArgumentException if called on a Request that was created without a URL.
          */
         URL url();
 
@@ -397,7 +368,7 @@ public interface Connection {
         T url(URL url);
 
         /**
-         * Get the request method, which defaults to <code>GET</code>
+         * Get the request method
          * @return method
          */
         Method method();
@@ -420,7 +391,7 @@ public interface Connection {
          * @see #hasHeader(String)
          * @see #cookie(String)
          */
-        @Nullable String header(String name);
+        String header(String name);
 
         /**
          * Get the values of a header.
@@ -495,7 +466,7 @@ public interface Connection {
          * @param name name of cookie to retrieve.
          * @return value of cookie, or null if not set
          */
-        @Nullable String cookie(String name);
+        String cookie(String name);
 
         /**
          * Set a cookie in this request/response.
@@ -529,20 +500,19 @@ public interface Connection {
     /**
      * Represents a HTTP request.
      */
-    @SuppressWarnings("UnusedReturnValue")
     interface Request extends Base<Request> {
         /**
          * Get the proxy used for this request.
          * @return the proxy; <code>null</code> if not enabled.
          */
-        @Nullable Proxy proxy();
+        Proxy proxy();
 
         /**
          * Update the proxy for this request.
          * @param proxy the proxy ot use; <code>null</code> to disable.
          * @return this Request, for chaining
          */
-        Request proxy(@Nullable Proxy proxy);
+        Request proxy(Proxy proxy);
 
         /**
          * Set the HTTP proxy to use for this request.
@@ -620,16 +590,19 @@ public interface Connection {
         Request ignoreContentType(boolean ignoreContentType);
 
         /**
-         * Get the current custom SSL socket factory, if any.
-         * @return custom SSL socket factory if set, null otherwise
+         * Get the current state of TLS (SSL) certificate validation.
+         * @return true if TLS cert validation enabled
+         * @deprecated
          */
-        @Nullable SSLSocketFactory sslSocketFactory();
+        boolean validateTLSCertificates();
 
         /**
-         * Set a custom SSL socket factory.
-         * @param sslSocketFactory SSL socket factory
+         * Set TLS certificate validation. <b>True</b> by default.
+         * @param value set false to ignore TLS (SSL) certificates
+         * @deprecated as distributions (specifically Google Play) are starting to show warnings if these checks are
+         * disabled.
          */
-        void sslSocketFactory(SSLSocketFactory sslSocketFactory);
+        void validateTLSCertificates(boolean value);
 
         /**
          * Add a data parameter to the request
@@ -652,16 +625,15 @@ public interface Connection {
          * .header("Content-Type", "application/json")
          * .post();</pre></code>
          * If any data key/vals are supplied, they will be sent as URL query params.
-         * @param body to use as the request body. Set to null to clear a previously set body.
          * @return this Request, for chaining
          */
-        Request requestBody(@Nullable String body);
+        Request requestBody(String body);
 
         /**
          * Get the current request body.
          * @return null if not set.
          */
-        @Nullable String requestBody();
+        String requestBody();
 
         /**
          * Specify the parser to use when parsing the document.
@@ -710,9 +682,9 @@ public interface Connection {
 
         /**
          * Get the character set name of the response, derived from the content-type header.
-         * @return character set name if set, <b>null</b> if not
+         * @return character set name
          */
-        @Nullable String charset();
+        String charset();
 
         /**
          * Set / override the response character set. When the document body is parsed it will be with this charset.
@@ -723,9 +695,9 @@ public interface Connection {
 
         /**
          * Get the response content type (e.g. "text/html");
-         * @return the response content type, or <b>null</b> if one was not set
+         * @return the response content type
          */
-        @Nullable String contentType();
+        String contentType();
 
         /**
          * Read and parse the body of the response as a Document. If you intend to parse the same response multiple
@@ -752,7 +724,6 @@ public interface Connection {
          * same connection response (otherwise, once the response is read, its InputStream will have been drained and
          * may not be re-read). Calling {@link #body() } or {@link #bodyAsBytes()} has the same effect.
          * @return this response, for chaining
-         * @throws UncheckedIOException if an IO exception occurs during buffering.
          */
         Response bufferUp();
 
@@ -807,7 +778,7 @@ public interface Connection {
          * Get the input stream associated with this keyval, if any
          * @return input stream if set, or null
          */
-        @Nullable InputStream inputStream();
+        InputStream inputStream();
 
         /**
          * Does this keyval have an input stream?
@@ -828,6 +799,6 @@ public interface Connection {
          * Get the current Content Type, or {@code null} if not set.
          * @return the current Content Type.
          */
-        @Nullable String contentType();
+        String contentType();
     }
 }

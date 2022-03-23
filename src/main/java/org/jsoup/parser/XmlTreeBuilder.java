@@ -1,17 +1,9 @@
 package org.jsoup.parser;
 
+import org.jsoup.Jsoup;
 import org.jsoup.helper.Validate;
-import org.jsoup.nodes.CDataNode;
-import org.jsoup.nodes.Comment;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.DocumentType;
-import org.jsoup.nodes.Element;
-import org.jsoup.nodes.Entities;
-import org.jsoup.nodes.Node;
-import org.jsoup.nodes.TextNode;
-import org.jsoup.nodes.XmlDeclaration;
+import org.jsoup.nodes.*;
 
-import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.List;
@@ -28,27 +20,19 @@ public class XmlTreeBuilder extends TreeBuilder {
         return ParseSettings.preserveCase;
     }
 
-    @Override @ParametersAreNonnullByDefault
-    protected void initialiseParse(Reader input, String baseUri, Parser parser) {
-        super.initialiseParse(input, baseUri, parser);
-        stack.add(doc); // place the document onto the stack. differs from HtmlTreeBuilder (not on stack)
-        doc.outputSettings()
-            .syntax(Document.OutputSettings.Syntax.xml)
-            .escapeMode(Entities.EscapeMode.xhtml)
-            .prettyPrint(false); // as XML, we don't understand what whitespace is significant or not
-    }
-
     Document parse(Reader input, String baseUri) {
-        return parse(input, baseUri, new Parser(this));
+        return parse(input, baseUri, ParseErrorList.noTracking(), ParseSettings.preserveCase);
     }
 
     Document parse(String input, String baseUri) {
-        return parse(new StringReader(input), baseUri, new Parser(this));
+        return parse(new StringReader(input), baseUri, ParseErrorList.noTracking(), ParseSettings.preserveCase);
     }
 
     @Override
-    XmlTreeBuilder newInstance() {
-        return new XmlTreeBuilder();
+    protected void initialiseParse(Reader input, String baseUri, ParseErrorList errors, ParseSettings settings) {
+        super.initialiseParse(input, baseUri, errors, settings);
+        stack.add(doc); // place the document onto the stack. differs from HtmlTreeBuilder (not on stack)
+        doc.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
     }
 
     @Override
@@ -78,17 +62,14 @@ public class XmlTreeBuilder extends TreeBuilder {
         return true;
     }
 
-    protected void insertNode(Node node) {
+    private void insertNode(Node node) {
         currentElement().appendChild(node);
     }
 
     Element insert(Token.StartTag startTag) {
-        Tag tag = tagFor(startTag.name(), settings);
+        Tag tag = Tag.valueOf(startTag.name(), settings);
         // todo: wonder if for xml parsing, should treat all tags as unknown? because it's not html.
-        if (startTag.hasAttributes())
-            startTag.attributes.deduplicate(settings);
-
-        Element el = new Element(tag, null, settings.normalizeAttributes(startTag.attributes));
+        Element el = new Element(tag, baseUri, settings.normalizeAttributes(startTag.attributes));
         insertNode(el);
         if (startTag.isSelfClosing()) {
             if (!tag.isKnownTag()) // unknown tag, remember this is self closing for output. see above.
@@ -102,12 +83,15 @@ public class XmlTreeBuilder extends TreeBuilder {
     void insert(Token.Comment commentToken) {
         Comment comment = new Comment(commentToken.getData());
         Node insert = comment;
-        if (commentToken.bogus && comment.isXmlDeclaration()) {
-            // xml declarations are emitted as bogus comments (which is right for html, but not xml)
+        if (commentToken.bogus) { // xml declarations are emitted as bogus comments (which is right for html, but not xml)
             // so we do a bit of a hack and parse the data as an element to pull the attributes out
-            XmlDeclaration decl = comment.asXmlDeclaration(); // else, we couldn't parse it as a decl, so leave as a comment
-            if (decl != null)
-                insert = decl;
+            String data = comment.getData();
+            if (data.length() > 1 && (data.startsWith("!") || data.startsWith("?"))) {
+                Document doc = Jsoup.parse("<" + data.substring(1, data.length() -1) + ">", baseUri, Parser.xmlParser());
+                Element el = doc.child(0);
+                insert = new XmlDeclaration(settings.normalizeTag(el.tagName()), data.startsWith("!"));
+                insert.attributes().addAll(el.attributes());
+            }
         }
         insertNode(insert);
     }
@@ -129,15 +113,11 @@ public class XmlTreeBuilder extends TreeBuilder {
      *
      * @param endTag tag to close
      */
-    protected void popStackToClose(Token.EndTag endTag) {
-        // like in HtmlTreeBuilder - don't scan up forever for very (artificially) deeply nested stacks
+    private void popStackToClose(Token.EndTag endTag) {
         String elName = settings.normalizeTag(endTag.tagName);
         Element firstFound = null;
 
-        final int bottom = stack.size() - 1;
-        final int upper = bottom >= maxQueueDepth ? bottom - maxQueueDepth : 0;
-
-        for (int pos = stack.size() -1; pos >= upper; pos--) {
+        for (int pos = stack.size() -1; pos >= 0; pos--) {
             Element next = stack.get(pos);
             if (next.nodeName().equals(elName)) {
                 firstFound = next;
@@ -154,17 +134,10 @@ public class XmlTreeBuilder extends TreeBuilder {
                 break;
         }
     }
-    private static final int maxQueueDepth = 256; // an arbitrary tension point between real XML and crafted pain
 
-
-
-    List<Node> parseFragment(String inputFragment, String baseUri, Parser parser) {
-        initialiseParse(new StringReader(inputFragment), baseUri, parser);
+    List<Node> parseFragment(String inputFragment, String baseUri, ParseErrorList errors, ParseSettings settings) {
+        initialiseParse(new StringReader(inputFragment), baseUri, errors, settings);
         runParser();
         return doc.childNodes();
-    }
-
-    List<Node> parseFragment(String inputFragment, Element context, String baseUri, Parser parser) {
-        return parseFragment(inputFragment, baseUri, parser);
     }
 }

@@ -1,15 +1,10 @@
 package org.jsoup.select;
 
 import org.jsoup.helper.Validate;
-import org.jsoup.internal.StringUtil;
-import org.jsoup.nodes.Comment;
-import org.jsoup.nodes.DataNode;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.FormElement;
 import org.jsoup.nodes.Node;
-import org.jsoup.nodes.TextNode;
 
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -184,8 +179,7 @@ public class Elements extends ArrayList<Element> {
      */
     public String val() {
         if (size() > 0)
-            //noinspection ConstantConditions
-            return first().val(); // first() != null as size() > 0
+            return first().val();
         else
             return "";
     }
@@ -211,13 +205,13 @@ public class Elements extends ArrayList<Element> {
      * @see #eachText()
      */
     public String text() {
-        StringBuilder sb = StringUtil.borrowBuilder();
+        StringBuilder sb = new StringBuilder();
         for (Element element : this) {
             if (sb.length() != 0)
                 sb.append(" ");
             sb.append(element.text());
         }
-        return StringUtil.releaseBuilder(sb);
+        return sb.toString();
     }
 
     /**
@@ -257,13 +251,13 @@ public class Elements extends ArrayList<Element> {
      * @see #outerHtml()
      */
     public String html() {
-        StringBuilder sb = StringUtil.borrowBuilder();
+        StringBuilder sb = new StringBuilder();
         for (Element element : this) {
             if (sb.length() != 0)
                 sb.append("\n");
             sb.append(element.html());
         }
-        return StringUtil.releaseBuilder(sb);
+        return sb.toString();
     }
     
     /**
@@ -273,13 +267,13 @@ public class Elements extends ArrayList<Element> {
      * @see #html()
      */
     public String outerHtml() {
-        StringBuilder sb = StringUtil.borrowBuilder();
+        StringBuilder sb = new StringBuilder();
         for (Element element : this) {
             if (sb.length() != 0)
                 sb.append("\n");
             sb.append(element.outerHtml());
         }
-        return StringUtil.releaseBuilder(sb);
+        return sb.toString();
     }
 
     /**
@@ -294,9 +288,8 @@ public class Elements extends ArrayList<Element> {
     }
 
     /**
-     * Update (rename) the tag name of each matched element. For example, to change each {@code <i>} to a {@code <em>}, do
+     * Update the tag name of each matched element. For example, to change each {@code <i>} to a {@code <em>}, do
      * {@code doc.select("i").tagName("em");}
-     *
      * @param tagName the new tag name
      * @return this, for chaining
      * @see Element#tagName(String)
@@ -517,7 +510,7 @@ public class Elements extends ArrayList<Element> {
     }
 
     /**
-     * Get each of the following element siblings of each element in this list.
+     * Get all of the following element siblings of each element in this list.
      * @return all following element siblings.
      */
     public Elements nextAll() {
@@ -525,7 +518,7 @@ public class Elements extends ArrayList<Element> {
     }
 
     /**
-     * Get each of the following element siblings of each element in this list, that match the query.
+     * Get all of the following element siblings of each element in this list, filtered by the query.
      * @param query CSS query to match siblings against
      * @return all following element siblings.
      */
@@ -551,7 +544,7 @@ public class Elements extends ArrayList<Element> {
     }
 
     /**
-     * Get each of the previous element siblings of each element in this list.
+     * Get all of the previous element siblings of each element in this list.
      * @return all previous element siblings.
      */
     public Elements prevAll() {
@@ -559,7 +552,7 @@ public class Elements extends ArrayList<Element> {
     }
 
     /**
-     * Get each of the previous element siblings of each element in this list, that match the query.
+     * Get all of the previous element siblings of each element in this list, filtered by the query.
      * @param query CSS query to match siblings against
      * @return all previous element siblings.
      */
@@ -567,7 +560,7 @@ public class Elements extends ArrayList<Element> {
         return siblings(query, false, true);
     }
 
-    private Elements siblings(@Nullable String query, boolean next, boolean all) {
+    private Elements siblings(String query, boolean next, boolean all) {
         Elements els = new Elements();
         Evaluator eval = query != null? QueryParser.parse(query) : null;
         for (Element e : this) {
@@ -601,7 +594,7 @@ public class Elements extends ArrayList<Element> {
      Get the first matched element.
      @return The first matched element, or <code>null</code> if contents is empty.
      */
-    public @Nullable Element first() {
+    public Element first() {
         return isEmpty() ? null : get(0);
     }
 
@@ -609,7 +602,7 @@ public class Elements extends ArrayList<Element> {
      Get the last matched element.
      @return The last matched element, or <code>null</code> if contents is empty.
      */
-    public @Nullable Element last() {
+    public Element last() {
         return isEmpty() ? null : get(size() - 1);
     }
 
@@ -644,43 +637,6 @@ public class Elements extends ArrayList<Element> {
             if (el instanceof FormElement)
                 forms.add((FormElement) el);
         return forms;
-    }
-
-    /**
-     * Get {@link Comment} nodes that are direct child nodes of the selected elements.
-     * @return Comment nodes, or an empty list if none.
-     */
-    public List<Comment> comments() {
-        return childNodesOfType(Comment.class);
-    }
-
-    /**
-     * Get {@link TextNode} nodes that are direct child nodes of the selected elements.
-     * @return TextNode nodes, or an empty list if none.
-     */
-    public List<TextNode> textNodes() {
-        return childNodesOfType(TextNode.class);
-    }
-
-    /**
-     * Get {@link DataNode} nodes that are direct child nodes of the selected elements. DataNode nodes contain the
-     * content of tags such as {@code script}, {@code style} etc and are distinct from {@link TextNode}s.
-     * @return Comment nodes, or an empty list if none.
-     */
-    public List<DataNode> dataNodes() {
-        return childNodesOfType(DataNode.class);
-    }
-
-    private <T extends Node> List<T> childNodesOfType(Class<T> tClass) {
-        ArrayList<T> nodes = new ArrayList<>();
-        for (Element el: this) {
-            for (int i = 0; i < el.childNodeSize(); i++) {
-                Node node = el.childNode(i);
-                if (tClass.isInstance(node))
-                    nodes.add(tClass.cast(node));
-            }
-        }
-        return nodes;
     }
 
 }

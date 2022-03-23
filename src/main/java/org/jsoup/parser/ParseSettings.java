@@ -26,20 +26,6 @@ public class ParseSettings {
     private final boolean preserveAttributeCase;
 
     /**
-     * Returns true if preserving tag name case.
-     */
-    public boolean preserveTagCase() {
-        return preserveTagCase;
-    }
-
-    /**
-     * Returns true if preserving attribute case.
-     */
-    public boolean preserveAttributeCase() {
-        return preserveAttributeCase;
-    }
-
-    /**
      * Define parse settings.
      * @param tag preserve tag case?
      * @param attribute preserve attribute name case?
@@ -49,24 +35,14 @@ public class ParseSettings {
         preserveAttributeCase = attribute;
     }
 
-    ParseSettings(ParseSettings copy) {
-        this(copy.preserveTagCase, copy.preserveAttributeCase);
-    }
-
-    /**
-     * Normalizes a tag name according to the case preservation setting.
-     */
-    public String normalizeTag(String name) {
+    String normalizeTag(String name) {
         name = name.trim();
         if (!preserveTagCase)
             name = lowerCase(name);
         return name;
     }
 
-    /**
-     * Normalizes an attribute according to the case preservation setting.
-     */
-    public String normalizeAttribute(String name) {
+    String normalizeAttribute(String name) {
         name = name.trim();
         if (!preserveAttributeCase)
             name = lowerCase(name);
@@ -74,14 +50,9 @@ public class ParseSettings {
     }
 
     Attributes normalizeAttributes(Attributes attributes) {
-        if (attributes != null && !preserveAttributeCase) {
+        if (!preserveAttributeCase) {
             attributes.normalize();
         }
         return attributes;
-    }
-
-    /** Returns the normal name that a Tag will have (trimmed and lower-cased) */
-    static String normalName(String name) {
-        return lowerCase(name.trim());
     }
 }

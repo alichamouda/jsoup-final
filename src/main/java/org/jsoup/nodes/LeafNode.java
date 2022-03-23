@@ -2,7 +2,6 @@ package org.jsoup.nodes;
 
 import org.jsoup.helper.Validate;
 
-import java.util.Collections;
 import java.util.List;
 
 abstract class LeafNode extends Node {
@@ -38,8 +37,9 @@ abstract class LeafNode extends Node {
 
     @Override
     public String attr(String key) {
+        Validate.notNull(key);
         if (!hasAttributes()) {
-            return nodeName().equals(key) ? (String) value : EmptyString;
+            return key.equals(nodeName()) ? (String) value : EmptyString;
         }
         return super.attr(key);
     }
@@ -89,23 +89,7 @@ abstract class LeafNode extends Node {
     }
 
     @Override
-    public Node empty() {
-        return this;
-    }
-
-    @Override
     protected List<Node> ensureChildNodes() {
-        return EmptyNodes;
-    }
-
-    @Override
-    protected LeafNode doClone(Node parent) {
-        LeafNode clone = (LeafNode) super.doClone(parent);
-
-        // Object value could be plain string or attributes - need to clone
-        if (hasAttributes())
-            clone.value = ((Attributes) value).clone();
-
-        return clone;
+        throw new UnsupportedOperationException("Leaf Nodes do not have child nodes.");
     }
 }

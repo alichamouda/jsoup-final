@@ -2,15 +2,10 @@ package org.jsoup.nodes;
 
 import org.jsoup.SerializationException;
 import org.jsoup.helper.Validate;
-import org.jsoup.internal.Normalizer;
-import org.jsoup.internal.StringUtil;
-import org.jsoup.nodes.Document.OutputSettings.Syntax;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  A single key + value attribute. (Only used for presentation.)
@@ -24,30 +19,29 @@ public class Attribute implements Map.Entry<String, String>, Cloneable  {
     };
 
     private String key;
-    @Nullable private String val;
-    @Nullable Attributes parent; // used to update the holding Attributes when the key / value is changed via this interface
+    private String val;
+    Attributes parent; // used to update the holding Attributes when the key / value is changed via this interface
 
     /**
      * Create a new attribute from unencoded (raw) key and value.
      * @param key attribute key; case is preserved.
-     * @param value attribute value (may be null)
+     * @param value attribute value
      * @see #createFromEncoded
      */
-    public Attribute(String key, @Nullable String value) {
+    public Attribute(String key, String value) {
         this(key, value, null);
     }
 
     /**
      * Create a new attribute from unencoded (raw) key and value.
      * @param key attribute key; case is preserved.
-     * @param val attribute value (may be null)
+     * @param val attribute value
      * @param parent the containing Attributes (this Attribute is not automatically added to said Attributes)
      * @see #createFromEncoded*/
-    public Attribute(String key, @Nullable String val, @Nullable Attributes parent) {
+    public Attribute(String key, String val, Attributes parent) {
         Validate.notNull(key);
-        key = key.trim();
+        this.key = key.trim();
         Validate.notEmpty(key); // trimming could potentially make empty, so validate here
-        this.key = key;
         this.val = val;
         this.parent = parent;
     }
@@ -56,7 +50,6 @@ public class Attribute implements Map.Entry<String, String>, Cloneable  {
      Get the attribute key.
      @return the attribute key
      */
-    @Override
     public String getKey() {
         return key;
     }
@@ -78,38 +71,26 @@ public class Attribute implements Map.Entry<String, String>, Cloneable  {
     }
 
     /**
-     Get the attribute value. Will return an empty string if the value is not set.
+     Get the attribute value.
      @return the attribute value
      */
-    @Override
     public String getValue() {
-        return Attributes.checkNotNull(val);
-    }
-
-    /**
-     * Check if this Attribute has a value. Set boolean attributes have no value.
-     * @return if this is a boolean attribute / attribute without a value
-     */
-    public boolean hasDeclaredValue() {
-        return val != null;
+        return val;
     }
 
     /**
      Set the attribute value.
-     @param val the new attribute value; may be null (to set an enabled boolean attribute)
-     @return the previous value (if was null; an empty string)
+     @param val the new attribute value; must not be null
      */
-    public String setValue(@Nullable String val) {
-        String oldVal = this.val;
+    public String setValue(String val) {
+        String oldVal = parent.get(this.key);
         if (parent != null) {
             int i = parent.indexOfKey(this.key);
-            if (i != Attributes.NotFound) {
-                oldVal = parent.get(this.key); // trust the container more
+            if (i != Attributes.NotFound)
                 parent.vals[i] = val;
-            }
         }
         this.val = val;
-        return Attributes.checkNotNull(oldVal);
+        return oldVal;
     }
 
     /**
@@ -117,28 +98,17 @@ public class Attribute implements Map.Entry<String, String>, Cloneable  {
      @return HTML
      */
     public String html() {
-        StringBuilder sb = StringUtil.borrowBuilder();
+        StringBuilder accum = new StringBuilder();
         
         try {
-        	html(sb, (new Document("")).outputSettings());
+        	html(accum, (new Document("")).outputSettings());
         } catch(IOException exception) {
         	throw new SerializationException(exception);
         }
-        return StringUtil.releaseBuilder(sb);
+        return accum.toString();
     }
 
-    protected void html(Appendable accum, Document.OutputSettings out) throws IOException {
-        html(key, val, accum, out);
-    }
-
-    protected static void html(String key, @Nullable String val, Appendable accum, Document.OutputSettings out) throws IOException {
-        key = getValidKey(key, out.syntax());
-        if (key == null) return; // can't write it :(
-        htmlNoValidate(key, val, accum, out);
-    }
-
-    static void htmlNoValidate(String key, @Nullable String val, Appendable accum, Document.OutputSettings out) throws IOException {
-        // structured like this so that Attributes can check we can write first, so it can add whitespace correctly
+    protected static void html(String key, String val, Appendable accum, Document.OutputSettings out) throws IOException {
         accum.append(key);
         if (!shouldCollapseAttribute(key, val, out)) {
             accum.append("=\"");
@@ -146,23 +116,9 @@ public class Attribute implements Map.Entry<String, String>, Cloneable  {
             accum.append('"');
         }
     }
-
-    private static final Pattern xmlKeyValid = Pattern.compile("[a-zA-Z_:][-a-zA-Z0-9_:.]*");
-    private static final Pattern xmlKeyReplace = Pattern.compile("[^-a-zA-Z0-9_:.]");
-    private static final Pattern htmlKeyValid = Pattern.compile("[^\\x00-\\x1f\\x7f-\\x9f \"'/=]+");
-    private static final Pattern htmlKeyReplace = Pattern.compile("[\\x00-\\x1f\\x7f-\\x9f \"'/=]");
-
-    @Nullable public static String getValidKey(String key, Syntax syntax) {
-        // we consider HTML attributes to always be valid. XML checks key validity
-        if (syntax == Syntax.xml && !xmlKeyValid.matcher(key).matches()) {
-            key = xmlKeyReplace.matcher(key).replaceAll("");
-            return xmlKeyValid.matcher(key).matches() ? key : null; // null if could not be coerced
-        }
-        else if (syntax == Syntax.html && !htmlKeyValid.matcher(key).matches()) {
-            key = htmlKeyReplace.matcher(key).replaceAll("");
-            return htmlKeyValid.matcher(key).matches() ? key : null; // null if could not be coerced
-        }
-        return key;
+    
+    protected void html(Appendable accum, Document.OutputSettings out) throws IOException {
+        html(key, val, accum, out);
     }
 
     /**
@@ -203,22 +159,28 @@ public class Attribute implements Map.Entry<String, String>, Cloneable  {
         return shouldCollapseAttribute(key, val, out);
     }
 
-    // collapse unknown foo=null, known checked=null, checked="", checked=checked; write out others
-    protected static boolean shouldCollapseAttribute(final String key, @Nullable final String val, final Document.OutputSettings out) {
+    protected static boolean shouldCollapseAttribute(final String key, final String val, final Document.OutputSettings out) {
         return (
-            out.syntax() == Syntax.html &&
-                (val == null || (val.isEmpty() || val.equalsIgnoreCase(key)) && Attribute.isBooleanAttribute(key)));
+            out.syntax() == Document.OutputSettings.Syntax.html &&
+                (val == null || ("".equals(val) || val.equalsIgnoreCase(key)) && Attribute.isBooleanAttribute(key)));
+    }
+
+    /**
+     * @deprecated
+     */
+    protected boolean isBooleanAttribute() {
+        return Arrays.binarySearch(booleanAttributes, key) >= 0 || val == null;
     }
 
     /**
      * Checks if this attribute name is defined as a boolean attribute in HTML5
      */
-    public static boolean isBooleanAttribute(final String key) {
-        return Arrays.binarySearch(booleanAttributes, Normalizer.lowerCase(key)) >= 0;
+    protected static boolean isBooleanAttribute(final String key) {
+        return Arrays.binarySearch(booleanAttributes, key) >= 0;
     }
 
     @Override
-    public boolean equals(@Nullable Object o) { // note parent not considered
+    public boolean equals(Object o) { // note parent not considered
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Attribute attribute = (Attribute) o;

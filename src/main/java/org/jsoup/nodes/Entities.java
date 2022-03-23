@@ -1,9 +1,8 @@
 package org.jsoup.nodes;
 
 import org.jsoup.SerializationException;
-import org.jsoup.internal.StringUtil;
+import org.jsoup.helper.StringUtil;
 import org.jsoup.helper.Validate;
-import org.jsoup.nodes.Document.OutputSettings;
 import org.jsoup.parser.CharacterReader;
 import org.jsoup.parser.Parser;
 
@@ -12,7 +11,6 @@ import java.nio.charset.CharsetEncoder;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import static org.jsoup.nodes.Document.OutputSettings.*;
 import static org.jsoup.nodes.Entities.EscapeMode.base;
 import static org.jsoup.nodes.Entities.EscapeMode.extended;
 
@@ -26,7 +24,7 @@ public class Entities {
     static final int codepointRadix = 36;
     private static final char[] codeDelims = {',', ';'};
     private static final HashMap<String, String> multipoints = new HashMap<>(); // name -> multiple character references
-    private static final OutputSettings DefaultOutput = new OutputSettings();
+    private static final Document.OutputSettings DefaultOutput = new Document.OutputSettings();
 
     public enum EscapeMode {
         /**
@@ -47,7 +45,7 @@ public class Entities {
         private int[] codeVals; // limitation is the few references with multiple characters; those go into multipoints.
 
         // table of codepoints to named entities.
-        private int[] codeKeys; // we don't support multicodepoints to single named value currently
+        private int[] codeKeys; // we don' support multicodepoints to single named value currently
         private String[] nameVals;
 
         EscapeMode(String file, int size) {
@@ -100,6 +98,17 @@ public class Entities {
     }
 
     /**
+     * Get the Character value of the named entity
+     *
+     * @param name named entity (e.g. "lt" or "amp")
+     * @return the Character value of the named entity (e.g. '{@literal <}' or '{@literal &}')
+     * @deprecated does not support characters outside the BMP or multiple character names
+     */
+    public static Character getCharacterByName(String name) {
+        return (char) extended.codepointForName(name);
+    }
+
+    /**
      * Get the character(s) represented by the named entity
      *
      * @param name entity (e.g. "lt" or "amp")
@@ -137,16 +146,16 @@ public class Entities {
      * @param out the output settings to use
      * @return the escaped string
      */
-    public static String escape(String string, OutputSettings out) {
+    public static String escape(String string, Document.OutputSettings out) {
         if (string == null)
             return "";
-        StringBuilder accum = StringUtil.borrowBuilder();
+        StringBuilder accum = new StringBuilder(string.length() * 2);
         try {
             escape(accum, string, out, false, false, false);
         } catch (IOException e) {
             throw new SerializationException(e); // doesn't happen
         }
-        return StringUtil.releaseBuilder(accum);
+        return accum.toString();
     }
 
     /**
@@ -161,7 +170,7 @@ public class Entities {
     }
 
     // this method is ugly, and does a lot. but other breakups cause rescanning and stringbuilder generations
-    static void escape(Appendable accum, String string, OutputSettings out,
+    static void escape(Appendable accum, String string, Document.OutputSettings out,
                        boolean inAttribute, boolean normaliseWhite, boolean stripLeadingWhite) throws IOException {
 
         boolean lastWasWhite = false;
@@ -202,8 +211,8 @@ public class Entities {
                             accum.append("&#xa0;");
                         break;
                     case '<':
-                        // escape when in character data or when in a xml attribute val or XML syntax; not needed in html attr val
-                        if (!inAttribute || escapeMode == EscapeMode.xhtml || out.syntax() == Syntax.xml)
+                        // escape when in character data or when in a xml attribue val; not needed in html attr val
+                        if (!inAttribute || escapeMode == EscapeMode.xhtml)
                             accum.append("&lt;");
                         else
                             accum.append(c);
@@ -220,17 +229,11 @@ public class Entities {
                         else
                             accum.append(c);
                         break;
-                    // we escape ascii control <x20 (other than tab, line-feed, carriage return)  for XML compliance (required) and HTML ease of reading (not required) - https://www.w3.org/TR/xml/#charsets
-                    case 0x9:
-                    case 0xA:
-                    case 0xD:
-                        accum.append(c);
-                        break;
                     default:
-                        if (c < 0x20 || !canEncode(coreCharset, c, encoder))
-                            appendEncoded(accum, escapeMode, codePoint);
-                        else
+                        if (canEncode(coreCharset, c, encoder))
                             accum.append(c);
+                        else
+                            appendEncoded(accum, escapeMode, codePoint);
                 }
             } else {
                 final String c = new String(Character.toChars(codePoint));
@@ -244,7 +247,7 @@ public class Entities {
 
     private static void appendEncoded(Appendable accum, EscapeMode escapeMode, int codePoint) throws IOException {
         final String name = escapeMode.nameForCodepoint(codePoint);
-        if (!emptyName.equals(name)) // ok for identity check
+        if (name != emptyName) // ok for identity check
             accum.append('&').append(name).append(';');
         else
             accum.append("&#x").append(Integer.toHexString(codePoint)).append(';');
@@ -316,40 +319,37 @@ public class Entities {
 
         int i = 0;
         CharacterReader reader = new CharacterReader(pointsData);
-        try {
-            while (!reader.isEmpty()) {
-                // NotNestedLessLess=10913,824;1887&
 
-                final String name = reader.consumeTo('=');
-                reader.advance();
-                final int cp1 = Integer.parseInt(reader.consumeToAny(codeDelims), codepointRadix);
-                final char codeDelim = reader.current();
-                reader.advance();
-                final int cp2;
-                if (codeDelim == ',') {
-                    cp2 = Integer.parseInt(reader.consumeTo(';'), codepointRadix);
-                    reader.advance();
-                } else {
-                    cp2 = empty;
-                }
-                final String indexS = reader.consumeTo('&');
-                final int index = Integer.parseInt(indexS, codepointRadix);
-                reader.advance();
+        while (!reader.isEmpty()) {
+            // NotNestedLessLess=10913,824;1887&
 
-                e.nameKeys[i] = name;
-                e.codeVals[i] = cp1;
-                e.codeKeys[index] = cp1;
-                e.nameVals[index] = name;
-
-                if (cp2 != empty) {
-                    multipoints.put(name, new String(new int[]{cp1, cp2}, 0, 2));
-                }
-                i++;
+            final String name = reader.consumeTo('=');
+            reader.advance();
+            final int cp1 = Integer.parseInt(reader.consumeToAny(codeDelims), codepointRadix);
+            final char codeDelim = reader.current();
+            reader.advance();
+            final int cp2;
+            if (codeDelim == ',') {
+                cp2 = Integer.parseInt(reader.consumeTo(';'), codepointRadix);
+                reader.advance();
+            } else {
+                cp2 = empty;
             }
+            final String indexS = reader.consumeTo('&');
+            final int index = Integer.parseInt(indexS, codepointRadix);
+            reader.advance();
 
-            Validate.isTrue(i == size, "Unexpected count of entities loaded");
-        } finally {
-            reader.close();
+            e.nameKeys[i] = name;
+            e.codeVals[i] = cp1;
+            e.codeKeys[index] = cp1;
+            e.nameVals[index] = name;
+
+            if (cp2 != empty) {
+                multipoints.put(name, new String(new int[]{cp1, cp2}, 0, 2));
+            }
+            i++;
         }
+
+        Validate.isTrue(i == size, "Unexpected count of entities loaded");
     }
 }

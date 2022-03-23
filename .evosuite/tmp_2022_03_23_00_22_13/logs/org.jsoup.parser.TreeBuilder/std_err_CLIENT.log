@@ -1,0 +1,2 @@
+[MASTER] 00:33:14.896 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.concurrent.ForkJoinTask<V> : Type points to itself
+[MASTER] 00:33:39.189 [pool-2-thread-1] ERROR TestCluster - Failed to check cache for java.util.Comparator<T> : Type points to itself

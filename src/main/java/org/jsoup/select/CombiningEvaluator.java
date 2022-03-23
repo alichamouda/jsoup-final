@@ -1,9 +1,8 @@
 package org.jsoup.select;
 
-import org.jsoup.internal.StringUtil;
+import org.jsoup.helper.StringUtil;
 import org.jsoup.nodes.Element;
 
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -11,7 +10,7 @@ import java.util.Collection;
 /**
  * Base combining (and, or) evaluator.
  */
-public abstract class CombiningEvaluator extends Evaluator {
+abstract class CombiningEvaluator extends Evaluator {
     final ArrayList<Evaluator> evaluators;
     int num = 0;
 
@@ -26,7 +25,7 @@ public abstract class CombiningEvaluator extends Evaluator {
         updateNumEvaluators();
     }
 
-    @Nullable Evaluator rightMostEvaluator() {
+    Evaluator rightMostEvaluator() {
         return num > 0 ? evaluators.get(num - 1) : null;
     }
     
@@ -39,7 +38,7 @@ public abstract class CombiningEvaluator extends Evaluator {
         num = evaluators.size();
     }
 
-    public static final class And extends CombiningEvaluator {
+    static final class And extends CombiningEvaluator {
         And(Collection<Evaluator> evaluators) {
             super(evaluators);
         }
@@ -50,7 +49,7 @@ public abstract class CombiningEvaluator extends Evaluator {
 
         @Override
         public boolean matches(Element root, Element node) {
-            for (int i = num - 1; i >= 0; i--) { // process backwards so that :matchText is evaled earlier, to catch parent query. todo - should redo matchText to virtually expand during match, not pre-match (see SelectorTest#findBetweenSpan)
+            for (int i = 0; i < num; i++) {
                 Evaluator s = evaluators.get(i);
                 if (!s.matches(root, node))
                     return false;
@@ -60,11 +59,11 @@ public abstract class CombiningEvaluator extends Evaluator {
 
         @Override
         public String toString() {
-            return StringUtil.join(evaluators, "");
+            return StringUtil.join(evaluators, " ");
         }
     }
 
-    public static final class Or extends CombiningEvaluator {
+    static final class Or extends CombiningEvaluator {
         /**
          * Create a new Or evaluator. The initial evaluators are ANDed together and used as the first clause of the OR.
          * @param evaluators initial OR clause (these are wrapped into an AND evaluator).

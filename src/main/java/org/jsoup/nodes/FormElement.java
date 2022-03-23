@@ -53,24 +53,19 @@ public class FormElement extends Element {
     }
 
     /**
-     Prepare to submit this form. A Connection object is created with the request set up from the form values. This
-     Connection will inherit the settings and the cookies (etc) of the connection/session used to request this Document
-     (if any), as available in {@link Document#connection()}
-     <p>You can then set up other options (like user-agent, timeout, cookies), then execute it.</p>
-
-     @return a connection prepared from the values of this form, in the same session as the one used to request it
-     @throws IllegalArgumentException if the form's absolute action URL cannot be determined. Make sure you pass the
-     document's base URI when parsing.
+     * Prepare to submit this form. A Connection object is created with the request set up from the form values. You
+     * can then set up other options (like user-agent, timeout, cookies), then execute it.
+     * @return a connection prepared from the values of this form.
+     * @throws IllegalArgumentException if the form's absolute action URL cannot be determined. Make sure you pass the
+     * document's base URI when parsing.
      */
     public Connection submit() {
         String action = hasAttr("action") ? absUrl("action") : baseUri();
         Validate.notEmpty(action, "Could not determine a form action URL for submit. Ensure you set a base URI when parsing.");
-        Connection.Method method = attr("method").equalsIgnoreCase("POST") ?
+        Connection.Method method = attr("method").toUpperCase().equals("POST") ?
                 Connection.Method.POST : Connection.Method.GET;
 
-        Document owner = ownerDocument();
-        Connection connection = owner != null? owner.connection().newRequest() : Jsoup.newSession();
-        return connection.url(action)
+        return Jsoup.connect(action)
                 .data(formData())
                 .method(method);
     }
@@ -91,9 +86,7 @@ public class FormElement extends Element {
             if (name.length() == 0) continue;
             String type = el.attr("type");
 
-            if (type.equalsIgnoreCase("button")) continue; // browsers don't submit these
-
-            if ("select".equals(el.normalName())) {
+            if ("select".equals(el.tagName())) {
                 Elements options = el.select("option[selected]");
                 boolean set = false;
                 for (Element option: options) {
@@ -101,7 +94,7 @@ public class FormElement extends Element {
                     set = true;
                 }
                 if (!set) {
-                    Element option = el.selectFirst("option");
+                    Element option = el.select("option").first();
                     if (option != null)
                         data.add(HttpConnection.KeyVal.create(name, option.val()));
                 }
@@ -116,10 +109,5 @@ public class FormElement extends Element {
             }
         }
         return data;
-    }
-
-    @Override
-    public FormElement clone() {
-        return (FormElement) super.clone();
     }
 }

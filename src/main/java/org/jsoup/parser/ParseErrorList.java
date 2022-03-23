@@ -9,21 +9,11 @@ import java.util.ArrayList;
  */
 public class ParseErrorList extends ArrayList<ParseError>{
     private static final int INITIAL_CAPACITY = 16;
-    private final int initialCapacity;
     private final int maxSize;
     
     ParseErrorList(int initialCapacity, int maxSize) {
         super(initialCapacity);
-        this.initialCapacity = initialCapacity;
         this.maxSize = maxSize;
-    }
-
-    /**
-     Create a new ParseErrorList with the same settings, but no errors in the list
-     @param copy initial and max size details to copy
-     */
-    ParseErrorList(ParseErrorList copy) {
-        this(copy.initialCapacity, copy.maxSize);
     }
     
     boolean canAddError() {
@@ -40,11 +30,5 @@ public class ParseErrorList extends ArrayList<ParseError>{
     
     public static ParseErrorList tracking(int maxSize) {
         return new ParseErrorList(INITIAL_CAPACITY, maxSize);
-    }
-
-    @Override
-    public Object clone() {
-        // all class fields are primitive, so native clone is enough.
-        return super.clone();
     }
 }

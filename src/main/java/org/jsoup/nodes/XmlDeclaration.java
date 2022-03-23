@@ -1,7 +1,6 @@
 package org.jsoup.nodes;
 
 import org.jsoup.SerializationException;
-import org.jsoup.internal.StringUtil;
 import org.jsoup.helper.Validate;
 
 import java.io.IOException;
@@ -24,6 +23,18 @@ public class XmlDeclaration extends LeafNode {
         this.isProcessingInstruction = isProcessingInstruction;
     }
 
+    /**
+     * Create a new XML declaration
+     * @param name of declaration
+     * @param baseUri Leaf Nodes don't have base URIs; they inherit from their Element
+     * @param isProcessingInstruction is processing instruction
+     * @see XmlDeclaration#XmlDeclaration(String, boolean)
+     * @deprecated
+     */
+    public XmlDeclaration(String name, String baseUri, boolean isProcessingInstruction) {
+        this(name, isProcessingInstruction);
+    }
+
     public String nodeName() {
         return "#declaration";
     }
@@ -41,28 +52,20 @@ public class XmlDeclaration extends LeafNode {
      * @return XML declaration
      */
     public String getWholeDeclaration() {
-        StringBuilder sb = StringUtil.borrowBuilder();
+        StringBuilder sb = new StringBuilder();
         try {
             getWholeDeclaration(sb, new Document.OutputSettings());
         } catch (IOException e) {
             throw new SerializationException(e);
         }
-        return StringUtil.releaseBuilder(sb).trim();
+        return sb.toString().trim();
     }
 
     private void getWholeDeclaration(Appendable accum, Document.OutputSettings out) throws IOException {
         for (Attribute attribute : attributes()) {
-            String key = attribute.getKey();
-            String val = attribute.getValue();
-            if (!key.equals(nodeName())) { // skips coreValue (name)
+            if (!attribute.getKey().equals(nodeName())) { // skips coreValue (name)
                 accum.append(' ');
-                // basically like Attribute, but skip empty vals in XML
-                accum.append(key);
-                if (!val.isEmpty()) {
-                    accum.append("=\"");
-                    Entities.escape(accum, val, out, true, false, false);
-                    accum.append('"');
-                }
+                attribute.html(accum, out);
             }
         }
     }
@@ -84,10 +87,5 @@ public class XmlDeclaration extends LeafNode {
     @Override
     public String toString() {
         return outerHtml();
-    }
-
-    @Override
-    public XmlDeclaration clone() {
-        return (XmlDeclaration) super.clone();
     }
 }

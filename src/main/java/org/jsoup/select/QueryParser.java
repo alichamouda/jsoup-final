@@ -1,6 +1,6 @@
 package org.jsoup.select;
 
-import org.jsoup.internal.StringUtil;
+import org.jsoup.helper.StringUtil;
 import org.jsoup.helper.Validate;
 import org.jsoup.parser.TokenQueue;
 
@@ -18,17 +18,15 @@ public class QueryParser {
     private final static String[] combinators = {",", ">", "+", "~", " "};
     private static final String[] AttributeEvals = new String[]{"=", "!=", "^=", "$=", "*=", "~="};
 
-    private final TokenQueue tq;
-    private final String query;
-    private final List<Evaluator> evals = new ArrayList<>();
+    private TokenQueue tq;
+    private String query;
+    private List<Evaluator> evals = new ArrayList<>();
 
     /**
      * Create a new QueryParser.
      * @param query CSS query
      */
     private QueryParser(String query) {
-        Validate.notEmpty(query);
-        query = query.trim();
         this.query = query;
         this.tq = new TokenQueue(query);
     }
@@ -37,7 +35,6 @@ public class QueryParser {
      * Parse a CSS query into an Evaluator.
      * @param query CSS query
      * @return Evaluator
-     * @see Selector selector query syntax
      */
     public static Evaluator parse(String query) {
         try {
@@ -95,7 +92,6 @@ public class QueryParser {
             // make sure OR (,) has precedence:
             if (rootEval instanceof CombiningEvaluator.Or && combinator != ',') {
                 currentEval = ((CombiningEvaluator.Or) currentEval).rightMostEvaluator();
-                assert currentEval != null; // rightMost signature can return null (if none set), but always will have one by this point
                 replaceRightMost = true;
             }
         }
@@ -105,33 +101,28 @@ public class QueryParser {
         evals.clear();
 
         // for most combinators: change the current eval into an AND of the current eval and the new eval
-        switch (combinator) {
-            case '>':
-                currentEval = new CombiningEvaluator.And(new StructuralEvaluator.ImmediateParent(currentEval), newEval);
-                break;
-            case ' ':
-                currentEval = new CombiningEvaluator.And(new StructuralEvaluator.Parent(currentEval), newEval);
-                break;
-            case '+':
-                currentEval = new CombiningEvaluator.And(new StructuralEvaluator.ImmediatePreviousSibling(currentEval), newEval);
-                break;
-            case '~':
-                currentEval = new CombiningEvaluator.And(new StructuralEvaluator.PreviousSibling(currentEval), newEval);
-                break;
-            case ',':
-                CombiningEvaluator.Or or;
-                if (currentEval instanceof CombiningEvaluator.Or) {
-                    or = (CombiningEvaluator.Or) currentEval;
-                } else {
-                    or = new CombiningEvaluator.Or();
-                    or.add(currentEval);
-                }
+        if (combinator == '>')
+            currentEval = new CombiningEvaluator.And(newEval, new StructuralEvaluator.ImmediateParent(currentEval));
+        else if (combinator == ' ')
+            currentEval = new CombiningEvaluator.And(newEval, new StructuralEvaluator.Parent(currentEval));
+        else if (combinator == '+')
+            currentEval = new CombiningEvaluator.And(newEval, new StructuralEvaluator.ImmediatePreviousSibling(currentEval));
+        else if (combinator == '~')
+            currentEval = new CombiningEvaluator.And(newEval, new StructuralEvaluator.PreviousSibling(currentEval));
+        else if (combinator == ',') { // group or.
+            CombiningEvaluator.Or or;
+            if (currentEval instanceof CombiningEvaluator.Or) {
+                or = (CombiningEvaluator.Or) currentEval;
                 or.add(newEval);
-                currentEval = or;
-                break;
-            default:
-                throw new Selector.SelectorParseException("Unknown combinator '%s'", combinator);
+            } else {
+                or = new CombiningEvaluator.Or();
+                or.add(currentEval);
+                or.add(newEval);
+            }
+            currentEval = or;
         }
+        else
+            throw new Selector.SelectorParseException("Unknown combinator: " + combinator);
 
         if (replaceRightMost)
             ((CombiningEvaluator.Or) rootEval).replaceRightMostEvaluator(currentEval);
@@ -140,21 +131,18 @@ public class QueryParser {
     }
 
     private String consumeSubQuery() {
-        StringBuilder sq = StringUtil.borrowBuilder();
+        StringBuilder sq = new StringBuilder();
         while (!tq.isEmpty()) {
             if (tq.matches("("))
                 sq.append("(").append(tq.chompBalanced('(', ')')).append(")");
             else if (tq.matches("["))
                 sq.append("[").append(tq.chompBalanced('[', ']')).append("]");
             else if (tq.matchesAny(combinators))
-                if (sq.length() > 0)
-                    break;
-                else
-                    tq.consume();
+                break;
             else
                 sq.append(tq.consume());
         }
-        return StringUtil.releaseBuilder(sq);
+        return sq.toString();
     }
 
     private void findElements() {
@@ -180,20 +168,12 @@ public class QueryParser {
             contains(false);
         else if (tq.matches(":containsOwn("))
             contains(true);
-        else if (tq.matches(":containsWholeText("))
-            containsWholeText(false);
-        else if (tq.matches(":containsWholeOwnText("))
-            containsWholeText(true);
         else if (tq.matches(":containsData("))
             containsData();
         else if (tq.matches(":matches("))
             matches(false);
         else if (tq.matches(":matchesOwn("))
             matches(true);
-        else if (tq.matches(":matchesWholeText("))
-            matchesWholeText(false);
-        else if (tq.matches(":matchesWholeOwnText("))
-            matchesWholeText(true);
         else if (tq.matches(":not("))
             not();
 		else if (tq.matchChomp(":nth-child("))
@@ -240,25 +220,19 @@ public class QueryParser {
     }
 
     private void byTag() {
-        // todo - these aren't dealing perfectly with case sensitivity. For case sensitive parsers, we should also make
-        // the tag in the selector case-sensitive (and also attribute names). But for now, normalize (lower-case) for
-        // consistency - both the selector and the element tag
-        String tagName = normalize(tq.consumeElementSelector());
+        String tagName = tq.consumeElementSelector();
+
         Validate.notEmpty(tagName);
 
         // namespaces: wildcard match equals(tagName) or ending in ":"+tagName
         if (tagName.startsWith("*|")) {
-            String plainTag = tagName.substring(2); // strip *|
-            evals.add(new CombiningEvaluator.Or(
-                new Evaluator.Tag(plainTag),
-                new Evaluator.TagEndsWith(tagName.replace("*|", ":")))
-            );
+            evals.add(new CombiningEvaluator.Or(new Evaluator.Tag(normalize(tagName)), new Evaluator.TagEndsWith(normalize(tagName.replace("*|", ":")))));
         } else {
             // namespaces: if element name is "abc:def", selector must be "abc|def", so flip:
             if (tagName.contains("|"))
                 tagName = tagName.replace("|", ":");
 
-            evals.add(new Evaluator.Tag(tagName));
+            evals.add(new Evaluator.Tag(tagName.trim()));
         }
     }
 
@@ -360,29 +334,19 @@ public class QueryParser {
     private void has() {
         tq.consume(":has");
         String subQuery = tq.chompBalanced('(', ')');
-        Validate.notEmpty(subQuery, ":has(selector) subselect must not be empty");
+        Validate.notEmpty(subQuery, ":has(el) subselect must not be empty");
         evals.add(new StructuralEvaluator.Has(parse(subQuery)));
     }
 
     // pseudo selector :contains(text), containsOwn(text)
     private void contains(boolean own) {
-        String query = own ? ":containsOwn" : ":contains";
-        tq.consume(query);
+        tq.consume(own ? ":containsOwn" : ":contains");
         String searchText = TokenQueue.unescape(tq.chompBalanced('(', ')'));
-        Validate.notEmpty(searchText, query + "(text) query must not be empty");
-        evals.add(own
-            ? new Evaluator.ContainsOwnText(searchText)
-            : new Evaluator.ContainsText(searchText));
-    }
-
-    private void containsWholeText(boolean own) {
-        String query = own ? ":containsWholeOwnText" : ":containsWholeText";
-        tq.consume(query);
-        String searchText = TokenQueue.unescape(tq.chompBalanced('(', ')'));
-        Validate.notEmpty(searchText, query + "(text) query must not be empty");
-        evals.add(own
-            ? new Evaluator.ContainsWholeOwnText(searchText)
-            : new Evaluator.ContainsWholeText(searchText));
+        Validate.notEmpty(searchText, ":contains(text) query must not be empty");
+        if (own)
+            evals.add(new Evaluator.ContainsOwnText(searchText));
+        else
+            evals.add(new Evaluator.ContainsText(searchText));
     }
 
     // pseudo selector :containsData(data)
@@ -395,26 +359,14 @@ public class QueryParser {
 
     // :matches(regex), matchesOwn(regex)
     private void matches(boolean own) {
-        String query = own ? ":matchesOwn" : ":matches";
-        tq.consume(query);
+        tq.consume(own ? ":matchesOwn" : ":matches");
         String regex = tq.chompBalanced('(', ')'); // don't unescape, as regex bits will be escaped
-        Validate.notEmpty(regex, query + "(regex) query must not be empty");
+        Validate.notEmpty(regex, ":matches(regex) query must not be empty");
 
-        evals.add(own
-            ? new Evaluator.MatchesOwn(Pattern.compile(regex))
-            : new Evaluator.Matches(Pattern.compile(regex)));
-    }
-
-    // :matches(regex), matchesOwn(regex)
-    private void matchesWholeText(boolean own) {
-        String query = own ? ":matchesWholeOwnText" : ":matchesWholeText";
-        tq.consume(query);
-        String regex = tq.chompBalanced('(', ')'); // don't unescape, as regex bits will be escaped
-        Validate.notEmpty(regex, query + "(regex) query must not be empty");
-
-        evals.add(own
-            ? new Evaluator.MatchesWholeOwnText(Pattern.compile(regex))
-            : new Evaluator.MatchesWholeText(Pattern.compile(regex)));
+        if (own)
+            evals.add(new Evaluator.MatchesOwn(Pattern.compile(regex)));
+        else
+            evals.add(new Evaluator.Matches(Pattern.compile(regex)));
     }
 
     // :not(selector)
@@ -425,11 +377,4 @@ public class QueryParser {
 
         evals.add(new StructuralEvaluator.Not(parse(subQuery)));
     }
-
-    @Override
-    public String toString() {
-        return query;
-    }
-
-
 }

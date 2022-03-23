@@ -1,7 +1,6 @@
 package org.jsoup.parser;
 
 import org.jsoup.helper.Validate;
-import org.jsoup.internal.Normalizer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,13 +10,13 @@ import java.util.Map;
  *
  * @author Jonathan Hedley, jonathan@hedley.net
  */
-public class Tag implements Cloneable {
+public class Tag {
     private static final Map<String, Tag> tags = new HashMap<>(); // map of known tags
 
     private String tagName;
-    private String normalName; // always the lower case version of this tag, regardless of case preservation mode
-    private boolean isBlock = true; // block
+    private boolean isBlock = true; // block or inline
     private boolean formatAsBlock = true; // should be formatted as a block
+    private boolean canContainInline = true; // only pcdata if not
     private boolean empty = false; // can hold nothing; e.g. img
     private boolean selfClosing = false; // can self close (<foo />). used for unknown tags that self close, without forcing them as empty.
     private boolean preserveWhitespace = false; // for pre, textarea, script etc
@@ -26,7 +25,6 @@ public class Tag implements Cloneable {
 
     private Tag(String tagName) {
         this.tagName = tagName;
-        normalName = Normalizer.lowerCase(tagName);
     }
 
     /**
@@ -36,14 +34,6 @@ public class Tag implements Cloneable {
      */
     public String getName() {
         return tagName;
-    }
-
-    /**
-     * Get this tag's normalized (lowercased) name.
-     * @return the tag's normal name.
-     */
-    public String normalName() {
-        return normalName;
     }
 
     /**
@@ -61,18 +51,14 @@ public class Tag implements Cloneable {
         Tag tag = tags.get(tagName);
 
         if (tag == null) {
-            tagName = settings.normalizeTag(tagName); // the name we'll use
+            tagName = settings.normalizeTag(tagName);
             Validate.notEmpty(tagName);
-            String normalName = Normalizer.lowerCase(tagName); // the lower-case name to get tag settings off
-            tag = tags.get(normalName);
+            tag = tags.get(tagName);
 
             if (tag == null) {
                 // not defined: create default; go anywhere, do anything! (incl be inside a <p>)
                 tag = new Tag(tagName);
                 tag.isBlock = false;
-            } else if (settings.preserveTagCase() && !tagName.equals(normalName))  {
-                tag = tag.clone(); // get a new version vs the static one, so name update doesn't reset all
-                tag.tagName = tagName;
             }
         }
         return tag;
@@ -110,12 +96,31 @@ public class Tag implements Cloneable {
     }
 
     /**
+     * Gets if this tag can contain block tags.
+     *
+     * @return if tag can contain block tags
+     * @deprecated No longer used, and no different result than {{@link #isBlock()}}
+     */
+    public boolean canContainBlock() {
+        return isBlock;
+    }
+
+    /**
      * Gets if this tag is an inline tag.
      *
      * @return if this tag is an inline tag.
      */
     public boolean isInline() {
         return !isBlock;
+    }
+
+    /**
+     * Gets if this tag is a data only tag.
+     *
+     * @return if this tag is a data only tag
+     */
+    public boolean isData() {
+        return !canContainInline && !isEmpty();
     }
 
     /**
@@ -193,6 +198,7 @@ public class Tag implements Cloneable {
         Tag tag = (Tag) o;
 
         if (!tagName.equals(tag.tagName)) return false;
+        if (canContainInline != tag.canContainInline) return false;
         if (empty != tag.empty) return false;
         if (formatAsBlock != tag.formatAsBlock) return false;
         if (isBlock != tag.isBlock) return false;
@@ -207,6 +213,7 @@ public class Tag implements Cloneable {
         int result = tagName.hashCode();
         result = 31 * result + (isBlock ? 1 : 0);
         result = 31 * result + (formatAsBlock ? 1 : 0);
+        result = 31 * result + (canContainInline ? 1 : 0);
         result = 31 * result + (empty ? 1 : 0);
         result = 31 * result + (selfClosing ? 1 : 0);
         result = 31 * result + (preserveWhitespace ? 1 : 0);
@@ -220,15 +227,6 @@ public class Tag implements Cloneable {
         return tagName;
     }
 
-    @Override
-    protected Tag clone() {
-        try {
-            return (Tag) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     // internal static initialisers:
     // prepped from http://www.w3.org/TR/REC-html40/sgml/dtd.html and other sources
     private static final String[] blockTags = {
@@ -237,8 +235,7 @@ public class Tag implements Cloneable {
             "ul", "ol", "pre", "div", "blockquote", "hr", "address", "figure", "figcaption", "form", "fieldset", "ins",
             "del", "dl", "dt", "dd", "li", "table", "caption", "thead", "tfoot", "tbody", "colgroup", "col", "tr", "th",
             "td", "video", "audio", "canvas", "details", "menu", "plaintext", "template", "article", "main",
-            "svg", "math", "center", "template",
-            "dir", "applet", "marquee", "listing" // deprecated but still known / special handling
+            "svg", "math"
     };
     private static final String[] inlineTags = {
             "object", "base", "font", "tt", "i", "b", "u", "big", "small", "em", "strong", "dfn", "code", "samp", "kbd",
@@ -246,13 +243,12 @@ public class Tag implements Cloneable {
             "sub", "sup", "bdo", "iframe", "embed", "span", "input", "select", "textarea", "label", "button", "optgroup",
             "option", "legend", "datalist", "keygen", "output", "progress", "meter", "area", "param", "source", "track",
             "summary", "command", "device", "area", "basefont", "bgsound", "menuitem", "param", "source", "track",
-            "data", "bdi", "s", "strike", "nobr"
+            "data", "bdi", "s"
     };
     private static final String[] emptyTags = {
             "meta", "link", "base", "frame", "img", "br", "wbr", "embed", "hr", "input", "keygen", "col", "command",
             "device", "area", "basefont", "bgsound", "menuitem", "param", "source", "track"
     };
-    // todo - rework this to format contents as inline; and update html emitter in Element. Same output, just neater.
     private static final String[] formatAsInlineTags = {
             "title", "a", "p", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "address", "li", "th", "td", "script", "style",
             "ins", "del", "s"
@@ -286,6 +282,7 @@ public class Tag implements Cloneable {
         for (String tagName : emptyTags) {
             Tag tag = tags.get(tagName);
             Validate.notNull(tag);
+            tag.canContainInline = false;
             tag.empty = true;
         }
 
